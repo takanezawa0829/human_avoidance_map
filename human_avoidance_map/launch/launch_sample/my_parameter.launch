@@ -1,0 +1,5 @@
+<launch>
+    <node pkg="human_avoidance_map" name="my_parameter_node" type="my_parameter_node.py" output="screen">
+        <param name="my_parameter" value="10" type="int" />
+    </node>
+</launch>

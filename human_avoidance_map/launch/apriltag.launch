@@ -1,0 +1,51 @@
+<?xml version="1.0"?>
+<launch>
+    <!-- カメラの名前を設定 -->
+    <arg name="camera_name" default="sample_camera"/> 
+    <!-- カメラのデバイスファイルのパスを設定 -->
+    <arg name="video_device" default="/dev/video0"/> 
+    <!-- カメラのキャリブレーションファイルを設定 -->
+    <arg name="camera_info_url" default="file://$(find human_avoidance_map)/config/pc_front_camera.yaml"/> 
+
+
+    <!-- カメラを起動して画像データをSubscribeする -->
+    <node name="$(arg camera_name)" pkg="usb_cam" type="usb_cam_node">
+        <param name="pixel_format" value="yuyv" />
+        <param name="image_width" value="640" />
+        <param name="image_height" value="480" />
+        <param name="video_device" value="$(arg video_device)" />
+        <param name="camera_info_url" value="$(arg camera_info_url)"/>
+    </node>
+
+
+    <!-- Subscribeした画像データを補正して/image_proc topicとしてpublishする -->
+    <group ns="$(arg camera_name)">
+        <node name="image_proc" pkg="image_proc" type="image_proc" output="screen">
+            <remap from="image_raw" to="/$(arg camera_name)/image_raw"/>
+            <remap from="camera_info" to="/$(arg camera_name)/camera_info"/>
+        </node>
+    </group>
+
+
+    <!-- Subscribeした/image_procからapriltagを検出し、tfをpublishする -->
+    <!-- リモートデバッグの場合は"value="gdbserver localhost:10000"に設定 -->
+    <arg name="launch_prefix" default="" />
+    <!-- カメラ入力を設定 -->
+    <arg name="image_topic" default="image_rect" />
+    <arg name="queue_size" default="1" />
+    <!-- apriltag_rosの検出ノード -->
+    <node pkg="apriltag_ros" type="apriltag_ros_continuous_node" name="apriltag_ros_continuous_node" clear_params="true" output="screen" launch-prefix="$(arg launch_prefix)">
+        <!-- コードで使用されるトピックからROSネットワーク上のトピックにRemap -->
+        <remap from="image_rect" to="$(arg camera_name)/$(arg image_topic)" />
+        <remap from="camera_info" to="$(arg camera_name)/camera_info" />
+        <param name="publish_tag_detections_image" type="bool" value="true" /><!-- デフォルト: false -->
+        <param name="queue_size" type="int" value="$(arg queue_size)" />
+        <!-- パラメータをロード（タグファミリーやタグなどを含む） -->
+        <rosparam command="load" file="$(find human_avoidance_map)/config/apriltag_ros/settings.yaml"/>
+        <rosparam command="load" file="$(find human_avoidance_map)/config/apriltag_ros/tags.yaml"/>
+    </node>
+
+
+    <!-- 画像データを表示 -->
+    <node pkg="rviz" type="rviz" name="rviz" args="-d $(find human_avoidance_map)/config/rviz.rviz"/>
+</launch>
